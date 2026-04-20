@@ -1,0 +1,10 @@
+allowBuilds:
+  '@parcel/watcher': false
+  '@swc/core': false
+  # better-sqlite3 needs its native binding built post-install or every
+  # runtime import fails with "Could not locate the bindings file".
+  better-sqlite3: true
+  msw: false
+  # sharp is used by Next.js for production image optimization (AVIF/WebP).
+  sharp: true
+  unrs-resolver: false

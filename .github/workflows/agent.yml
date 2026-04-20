@@ -1,0 +1,44 @@
+name: IranENovin Agent
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_BOT_TOKEN }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --production=false
+
+      - name: Run agent
+        run: npx tsx scripts/agent.ts
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GITHUB_BOT_TOKEN: ${{ secrets.GITHUB_BOT_TOKEN }}
+          GITHUB_ORG: IraneNovinOrg
+          GITHUB_IDEAS_REPO: ideas
+
+      - name: Commit data changes
+        run: |
+          git config user.name "iranenovin-bot"
+          git config user.email "bot@iranenovin.com"
+          git add _data/
+          if git diff --staged --quiet; then
+            echo "No data changes"
+          else
+            git commit -m "agent: process updates [skip ci]"
+            git push
+          fi

@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+.next/
+out/
+build/
+dist/
+
+# Environment variables (secrets)
+.env
+.env.local
+.env.*.local
+
+# Database (keep schema, exclude data)
+_data/*.db
+_data/*.db-wal
+_data/*.db-shm
+_data/backup/
+
+# Internal development docs
+docs/
+CLAUDE.md
+DEPLOY.md
+.mcp.json
+
+# Sensitive config
+_config/ai.json
+_config/telegram.json
+
+# Claude Code local files
+.claude/
+.claude-flow/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Logs & temp
+*.log
+tmp/
+temp/
+
+# Build cache
+.turbo/
+tsconfig.tsbuildinfo

@@ -1,0 +1,44 @@
+name: Sync IranAzadAbad Ideas
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'    # Every 5 minutes — free and unlimited on public repos
+  workflow_dispatch:           # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_BOT_TOKEN }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run incremental sync
+        id: sync
+        run: node scripts/sync-iranazadabad.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_BOT_TOKEN }}
+
+      - name: Commit cache if changed
+        run: |
+          git config user.name "iranenovin-bot"
+          git config user.email "bot@iranenovin.com"
+          git add _data/iranazadabad-cache.json
+          if git diff --staged --quiet; then
+            echo "No changes to cache — skipping commit"
+          else
+            git commit -m "sync: incremental IAB update $(date -u +%H:%M)" && git push
+            echo "CACHE_UPDATED=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Vercel revalidation (only if cache changed)
+        if: steps.sync.outputs.CACHE_UPDATED == 'true'
+        run: |
+          curl -s -X POST "${{ secrets.NEXT_PUBLIC_APP_URL }}/api/sync" \
+            -H "Authorization: Bearer ${{ secrets.SYNC_SECRET }}" \
+            -H "Content-Type: application/json" || true

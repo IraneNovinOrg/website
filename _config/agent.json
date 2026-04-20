@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "enabled": true,
+  "cyclePeriodMinutes": 15,
+  "maxAnalysesPerCycle": 2,
+  "maxReviewsPerCycle": 3,
+  "cooldownMinutes": 10,
+  "autoActivateMinVotes": 20,
+  "analyzeMinVotes": 48,
+  "triggers": {
+    "comment_added": {
+      "enabled": true,
+      "minLength": 30,
+      "aiReply": true
+    },
+    "task_claimed": {
+      "enabled": true
+    },
+    "task_submitted": {
+      "enabled": true,
+      "autoReview": true
+    },
+    "task_note_added": {
+      "enabled": true,
+      "minLength": 30,
+      "aiReply": true
+    },
+    "help_offered": {
+      "enabled": true
+    },
+    "project_activated": {
+      "enabled": true,
+      "runAnalysis": true
+    }
+  },
+  "skills": [
+    "reply-to-comment",
+    "reply-to-task-note",
+    "create-tasks",
+    "review-submission",
+    "update-document",
+    "suggest-improvements"
+  ]
+}

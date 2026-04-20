@@ -1,0 +1,322 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════════
+   IranENovin — Lion & Sun Design System
+   Colors: Iran flag (green/white/red) + Persian heritage (gold/turquoise/indigo/terracotta)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    /* Core semantic tokens (HSL for alpha support via hsl(var(--foo) / 0.5)) */
+    --background: 45 33% 97%;          /* #FAF8F3 warm white */
+    --foreground: 60 5% 10%;            /* #1A1A18 near-black */
+    --card: 0 0% 100%;                  /* white */
+    --card-foreground: 60 5% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 60 5% 10%;
+
+    --primary: 148 100% 30%;            /* #009B3A Iran flag green */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 39 58% 55%;            /* #D4A843 heritage gold */
+    --secondary-foreground: 60 5% 10%;
+    --accent: 176 70% 41%;              /* #20B2AA Persian turquoise */
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 80 15% 94%;                /* green-tinted muted */
+    --muted-foreground: 60 5% 35%;
+
+    --destructive: 350 85% 42%;         /* #C8102E flag red */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 80 12% 86%;
+    --input: 80 12% 90%;
+    --ring: 148 100% 30%;
+
+    --radius: 0.75rem;
+
+    /* Brand colors as raw values (for gradients, SVG currentColor uses) */
+    --iran-green: #009B3A;
+    --iran-deep-green: #006B2D;
+    --iran-gold: #D4A843;
+    --iran-saffron: #F4B43C;
+    --iran-red: #C8102E;
+    --persia-turquoise: #20B2AA;
+    --persia-indigo: #2E3B5C;
+    --persia-terracotta: #B85C38;
+  }
+
+  .dark {
+    --background: 220 25% 6%;           /* #0F1419 soft black with blue */
+    --foreground: 60 10% 92%;
+    --card: 220 20% 9%;                 /* #1A1F26 elevated */
+    --card-foreground: 60 10% 92%;
+    --popover: 220 20% 9%;
+    --popover-foreground: 60 10% 92%;
+
+    --primary: 148 100% 42%;            /* #00D965 brighter green for contrast */
+    --primary-foreground: 0 0% 5%;
+    --secondary: 39 88% 60%;            /* #F4B43C saffron pops on dark */
+    --secondary-foreground: 0 0% 5%;
+    --accent: 176 70% 50%;
+    --accent-foreground: 0 0% 5%;
+
+    --muted: 220 15% 15%;
+    --muted-foreground: 220 10% 65%;
+
+    --destructive: 350 85% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 18%;
+    --input: 220 15% 18%;
+    --ring: 148 100% 42%;
+
+    --iran-green: #00D965;
+    --iran-deep-green: #009B3A;
+    --iran-gold: #F4B43C;
+    --iran-saffron: #F4B43C;
+    --iran-red: #E4192C;
+    --persia-turquoise: #20C9BF;
+    --persia-indigo: #4A5A85;
+    --persia-terracotta: #C86D45;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  /* Better Farsi reading */
+  html[dir="rtl"] body {
+    line-height: 1.75;
+  }
+
+  /* Selection color */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════════ */
+
+@layer utilities {
+  /* ─── Gradients ─── */
+  .gradient-iran {
+    background: linear-gradient(135deg, #006B2D 0%, #009B3A 50%, #006B2D 100%);
+  }
+  .gradient-iran-gold {
+    background: linear-gradient(135deg, #006B2D 0%, #009B3A 40%, #D4A843 100%);
+  }
+  .gradient-hero {
+    background:
+      radial-gradient(ellipse at top right, rgba(212, 168, 67, 0.18) 0%, transparent 55%),
+      radial-gradient(ellipse at bottom left, rgba(0, 217, 101, 0.15) 0%, transparent 55%),
+      linear-gradient(165deg, #003D1A 0%, #006B2D 45%, #009B3A 100%);
+  }
+  .gradient-sun {
+    background: radial-gradient(circle, #F4E5B8 0%, #F4B43C 45%, #D4A843 100%);
+  }
+  .gradient-persia {
+    background: linear-gradient(135deg, #2E3B5C 0%, #20B2AA 50%, #D4A843 100%);
+  }
+
+  /* ─── Text gradients ─── */
+  .text-gradient-iran {
+    background: linear-gradient(135deg, #006B2D 0%, #009B3A 50%, #D4A843 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #D4A843 0%, #F4B43C 50%, #F4E5B8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .text-gradient-sunset {
+    background: linear-gradient(135deg, #C8102E 0%, #D4A843 50%, #009B3A 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* ─── Glow effects ─── */
+  .glow-green {
+    box-shadow: 0 0 20px rgba(0, 155, 58, 0.3);
+  }
+  .glow-gold {
+    box-shadow: 0 0 24px rgba(212, 168, 67, 0.35);
+  }
+  .glow-red {
+    box-shadow: 0 0 20px rgba(200, 16, 46, 0.3);
+  }
+
+  /* ─── Card hover ─── */
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-iran-green hover:-translate-y-1;
+  }
+  .card-hover-gold {
+    @apply transition-all duration-300 hover:shadow-iran-gold hover:-translate-y-1;
+  }
+
+  /* ─── Persian geometric pattern backgrounds ─── */
+  .pattern-girih {
+    background-image: url("/brand/girih-pattern.svg");
+    background-size: 120px 120px;
+    background-repeat: repeat;
+    color: hsl(var(--primary));
+    opacity: 1;
+  }
+  .pattern-girih-subtle {
+    position: relative;
+  }
+  .pattern-girih-subtle::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("/brand/girih-pattern.svg");
+    background-size: 120px 120px;
+    background-repeat: repeat;
+    opacity: 0.06;
+    pointer-events: none;
+    color: currentColor;
+  }
+
+  /* ─── Scrollbar styling ─── */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.25);
+    border-radius: 3px;
+  }
+
+  /* ─── Typography utilities ─── */
+  .display-text {
+    font-family: var(--font-jakarta), var(--font-inter), system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+
+  html[dir="rtl"] .display-text {
+    font-family: var(--font-vazirmatn), system-ui, sans-serif;
+    letter-spacing: 0;
+  }
+
+  /* ─── Ornamental divider ─── */
+  .divider-ornament {
+    position: relative;
+    text-align: center;
+  }
+  .divider-ornament::before,
+  .divider-ornament::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 1px;
+    background: linear-gradient(
+      to var(--_dir, right),
+      transparent 0%,
+      hsl(var(--primary) / 0.35) 50%,
+      transparent 100%
+    );
+  }
+  .divider-ornament::before { left: 0; }
+  .divider-ornament::after { right: 0; }
+
+  /* ─── Focus ring ─── */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* ─── Shimmer loading ─── */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: hsl(var(--muted));
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--background) / 0.6),
+      transparent
+    );
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* ─── Drifting gold particles (Persian hero flourish) ─── */
+  @keyframes drift-up {
+    0%   { transform: translateY(0) translateX(0); opacity: 0; }
+    10%  { opacity: 0.6; }
+    50%  { transform: translateY(-50vh) translateX(10px); opacity: 0.75; }
+    90%  { opacity: 0.35; }
+    100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
+  }
+
+  .particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: radial-gradient(circle, #D4A843 0%, rgba(212, 168, 67, 0.3) 45%, transparent 75%);
+    border-radius: 50%;
+    animation: drift-up 15s linear infinite;
+    filter: blur(0.3px);
+    pointer-events: none;
+  }
+  .particle-sm { width: 2px; height: 2px; }
+  .particle-lg { width: 6px; height: 6px; }
+
+  /* ─── Soft drifting arabesque flourish (gentle fade in/out) ─── */
+  .arabesque-flourish {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    animation: arabesque-fade 9s ease-in-out infinite;
+  }
+
+  /* ─── Slow ken-burns background shift (30s+) ─── */
+  .bg-kenburns {
+    animation: ken-burns 40s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .particle,
+    .arabesque-flourish,
+    .bg-kenburns {
+      animation: none !important;
+    }
+  }
+}
