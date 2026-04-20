@@ -20,10 +20,7 @@ _data/*.db-wal
 _data/*.db-shm
 _data/backup/
 
-# Internal development docs
-docs/
-CLAUDE.md
-DEPLOY.md
+# Local tool config
 .mcp.json
 
 # Sensitive config
