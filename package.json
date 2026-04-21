@@ -13,6 +13,7 @@
     "test:all": "vitest run && playwright test",
     "setup": "tsx scripts/setup.ts",
     "db:init": "tsx scripts/setup.ts",
+    "test:codex": "tsx scripts/test-codex.ts",
     "sync": "tsx scripts/bootstrap-sync.ts"
   },
   "dependencies": {

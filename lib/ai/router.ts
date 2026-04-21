@@ -443,29 +443,47 @@ async function callCodexCLI(
   // not a TTY. Codex CLI uses Ink; when Ink opens a non-TTY stdin it
   // throws "Raw mode is not supported on the current process.stdin".
   //
-  // Fix: `stdio: ["ignore", "pipe", "pipe"]` gives the child a closed
-  // stdin so Ink skips raw-mode setup entirely. Belt-and-suspenders:
-  // CI=1 and TERM=dumb signal to Ink/most TUIs that they should render
-  // in non-interactive mode regardless.
-  const runCodex = (modelName: string): Promise<{ stdout: string; stderr: string }> =>
+  // Fix: give the child a `pipe` for stdin and end() it immediately —
+  // Codex / Ink see a real non-TTY stream (so `isRawModeSupported` returns
+  // false cleanly) but no data ever arrives, so the AgentLoop isn't
+  // confused by missing fds. This matches what `sh -c` did under the old
+  // exec approach. Using `stdio[0]="ignore"` (the previous attempt) closed
+  // the fd entirely, which crashed Codex's internal Ink init with
+  // "AgentLoop has been terminated".
+  //
+  // Belt-and-suspenders: CI=1 / TERM=dumb / NO_COLOR tell Ink + most TUIs
+  // to render in non-interactive mode.
+  const runCodex = (modelName: string): Promise<{ stdout: string; stderr: string; code: number }> =>
     new Promise((resolve, reject) => {
+      // Pass through the parent's environment unchanged. Earlier attempts
+      // set CI=1/TERM=dumb/NO_COLOR to nudge Codex into a non-interactive
+      // mode, but those actually *break* the newer Codex renderer — it
+      // bails before producing a complete response and exits code 1.
+      // The minimal change from the old `exec` path is: spawn + immediate
+      // stdin.end() so we don't hit shell-escape limits on long prompts
+      // and don't crash Ink on a missing stdin fd.
       const child = spawn("codex", buildArgs(modelName), {
-        stdio: ["ignore", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          // Tell Ink and common TUI libs we're not interactive.
-          CI: "1",
-          TERM: "dumb",
-          NO_COLOR: "1",
-          FORCE_COLOR: "0",
-        },
+        stdio: ["pipe", "pipe", "pipe"],
+        env: process.env,
       });
+
+      // Close stdin right away — Codex doesn't read from it in `exec` mode,
+      // and keeping it open would leave the child waiting on EOF forever.
+      try {
+        child.stdin?.end();
+      } catch {
+        /* child may have exited already */
+      }
 
       let stdout = "";
       let stderr = "";
       let stdoutSize = 0;
       let stderrSize = 0;
       const MAX_BUFFER = 4 * 1024 * 1024; // 4MB — codex can emit a lot
+
+      // Suppress EPIPE on stdin — harmless when the child exits before we
+      // get a chance to end() the stream.
+      child.stdin?.on("error", () => { /* ignore */ });
 
       child.stdout.on("data", (chunk: Buffer) => {
         stdoutSize += chunk.length;
@@ -489,27 +507,40 @@ async function callCodexCLI(
       });
       child.on("close", (code) => {
         clearTimeout(timer);
-        if (code === 0) {
-          resolve({ stdout, stderr });
-        } else {
-          // Surface the stderr tail — it usually contains the real error
-          // (bad model name, rate limit, auth expired, etc.).
-          const tail = stderr.slice(-400).trim();
-          reject(
-            new Error(
-              `Codex CLI exited code ${code}${tail ? `: ${tail}` : ""}`
-            )
-          );
+        const exit = code ?? 0;
+        // Accept non-zero exits when stdout still looks like an answer.
+        // In Codex 0.111+ stdout IS the clean answer (headers go to stderr),
+        // so any non-trivial stdout after the child exits is a valid reply.
+        const looksLikeGoodAnswer = stdout.trim().length > 0;
+        if (exit === 0 || looksLikeGoodAnswer) {
+          resolve({ stdout, stderr, code: exit });
+          return;
         }
+        // Real failure — surface both streams so we can actually see the
+        // cause (prompt-echo fragments in stderr are unhelpful alone).
+        const outTail = stdout.slice(-300).trim();
+        const errTail = stderr.slice(-300).trim();
+        const details = [
+          errTail && `stderr: ${errTail}`,
+          outTail && `stdout: ${outTail}`,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+        reject(
+          new Error(
+            `Codex CLI exited code ${exit}${details ? ` — ${details}` : ""}`
+          )
+        );
       });
     });
 
   try {
-    // Walk the model ladder. We only advance on "model not supported" /
-    // "not available" / "invalid model" errors — a rate-limit on model A
-    // would hit model B too, and an Ink crash means the CLI is broken
-    // (no point retrying).
-    let result: { stdout: string; stderr: string } | null = null;
+    // Walk the model ladder. Each attempt fails fast (≲1s for model-not-
+    // available), so trying every candidate is cheap. Only `hardFail`
+    // errors short-circuit the ladder — those are environmental problems
+    // (missing codex binary, our own timeout) where trying a different
+    // model won't help.
+    let result: { stdout: string; stderr: string; code: number } | null = null;
     for (const candidate of ladder) {
       modelUsed = candidate;
       console.log(
@@ -521,133 +552,67 @@ async function callCodexCLI(
       } catch (e) {
         lastErr = e as Error;
         const msg = (e as Error).message.toLowerCase();
-        const modelUnsupported =
-          msg.includes("not supported with this account") ||
-          msg.includes("invalid model") ||
-          msg.includes("model_not_found") ||
-          msg.includes("no access to model") ||
-          msg.includes("unknown model");
-        if (!modelUnsupported) throw e;
+        // Only give up the whole Codex path when something is truly wrong
+        // with the CLI itself. Everything else (model not available on this
+        // account, AgentLoop terminated, server-side rejections, etc.) is
+        // a reason to try the next model.
+        const hardFail =
+          msg.includes("enoent") ||                 // codex binary missing
+          msg.includes("codex cli not found") ||
+          msg.includes("timed out after");          // our own 120s cap
+        if (hardFail) throw e;
         console.warn(
-          `[AI Router] Model ${candidate} not available on this account — trying next fallback...`
+          `[AI Router] Codex model ${candidate} failed (${(e as Error).message.slice(0, 120)}) — trying next fallback...`
         );
       }
     }
     if (!result) {
       throw lastErr || new Error("All Codex models exhausted");
     }
+    console.log(`[AI Router] Codex succeeded with model ${modelUsed}`);
     const { stdout, stderr } = result;
 
     if (stderr) {
       console.warn(`[AI Router] Codex CLI (${modelUsed}) stderr: ${stderr.slice(0, 300)}`);
     }
 
-    // Codex CLI prints a header block then the response. The output looks like:
-    //   OpenAI Codex v0.111.0 (research preview)
-    //   --------
-    //   workdir: /path
-    //   model: gpt-5.4
-    //   provider: openai
-    //   ... more headers ...
-    //   --------
-    //   user
-    //   [echoed prompt]
-    //   mcp startup: ...
-    //   [actual assistant response]
+    // Codex CLI 0.111+ separates streams: stdout = clean answer,
+    // stderr = ceremony (version banner, config block, echoed prompt,
+    // "codex" role marker, token counter). So the primary extraction is
+    // literally `stdout.trim()` — no parsing needed.
     //
-    // We strip everything up to and including the second "--------" separator,
-    // then skip the echoed user prompt and "mcp startup" lines.
-    const combined = stdout + (stderr ? "\n" + stderr : "");
-    const lines = combined.split("\n");
+    // Older Codex versions wrote everything to stdout interleaved with
+    // `--------` header separators. We fall back to the old parser only
+    // when stdout is suspiciously short AND stderr contains the ceremony
+    // markers (meaning the answer might actually live in stderr).
+    let rawResponse = stdout.trim();
 
-    // Find the second "--------" separator (end of header block)
-    let separatorCount = 0;
-    let startIdx = 0;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim() === "--------") {
-        separatorCount++;
-        if (separatorCount >= 2) {
+    const looksLikeLegacyFormat =
+      rawResponse.length < 20 &&
+      (stderr.includes("--------") || /\bassistant\b|\bcodex\b/i.test(stderr));
+    if (looksLikeLegacyFormat) {
+      // Fall back: scan the combined stream for the assistant/codex marker.
+      const lines = (stderr + "\n" + stdout).split("\n");
+      let startIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        const tr = lines[i].trim().toLowerCase();
+        if (tr === "assistant" || tr === "codex") {
           startIdx = i + 1;
           break;
         }
       }
-    }
-
-    // The output after the second separator looks like:
-    //   user
-    //   [full echoed prompt - system + user message]
-    //   mcp startup: ...
-    //   assistant (or codex)
-    //   [actual AI response]
-    //
-    // Strategy: find the "assistant" or "codex" role marker line that
-    // separates the echoed prompt from the actual response.
-    let responseLines = lines.slice(startIdx);
-
-    // Find the "assistant" or "codex" marker that begins the actual response
-    let assistantIdx = -1;
-    for (let i = 0; i < responseLines.length; i++) {
-      const line = responseLines[i].trim().toLowerCase();
-      if (line === "assistant" || line === "codex") {
-        assistantIdx = i + 1;
-        break;
-      }
-    }
-
-    if (assistantIdx > 0) {
-      // Found the marker — everything after it is the actual response
-      responseLines = responseLines.slice(assistantIdx);
-    } else {
-      // No explicit marker — fall back to skipping known metadata lines
-      while (responseLines.length > 0) {
-        const line = responseLines[0].trim();
-        if (line === "user" || line.startsWith("mcp startup") || line === "" ||
-            line.startsWith("approval:") || line.startsWith("sandbox:") ||
-            line.startsWith("reasoning") || line.startsWith("session id:")) {
-          responseLines.shift();
-          continue;
+      if (startIdx > 0) {
+        const tail: string[] = [];
+        for (let i = startIdx; i < lines.length; i++) {
+          const tr = lines[i].trim();
+          // Stop at the "tokens used" footer.
+          if (tr.toLowerCase() === "tokens used") break;
+          tail.push(lines[i]);
         }
-        // Skip lines that look like part of the echoed system prompt
-        if (line.startsWith("# ") || line.startsWith("## ") ||
-            line.startsWith("**Title:**") || line.startsWith("**Category:**") ||
-            line.startsWith("You are analyzing") || line.startsWith("Think step by step")) {
-          responseLines.shift();
-          continue;
-        }
-        // If we see the echoed user prompt, skip it
-        if (user.startsWith(line.slice(0, 30)) && line.length > 10) {
-          responseLines.shift();
-          continue;
-        }
-        break;
+        rawResponse = tail.join("\n").trim();
       }
     }
 
-    // Strip any remaining "mcp startup" and blank lines at the start
-    while (responseLines.length > 0) {
-      const line = responseLines[0].trim();
-      if (line === "" || line.startsWith("mcp startup")) {
-        responseLines.shift();
-        continue;
-      }
-      break;
-    }
-
-    // Also try the old approach as fallback
-    if (responseLines.join("\n").trim() === "") {
-      let providerIdx = -1;
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith("provider:")) {
-          providerIdx = i + 1;
-          break;
-        }
-      }
-      if (providerIdx >= 0) {
-        responseLines = lines.slice(providerIdx);
-      }
-    }
-
-    const rawResponse = responseLines.join("\n").trim();
     const response = sanitizeAIOutput(rawResponse);
 
     if (!response) throw new Error("Empty response from Codex CLI");
