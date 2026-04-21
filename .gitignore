@@ -23,10 +23,6 @@ _data/backup/
 # Local tool config
 .mcp.json
 
-# Sensitive config
-_config/ai.json
-_config/telegram.json
-
 # Claude Code local files
 .claude/
 .claude-flow/

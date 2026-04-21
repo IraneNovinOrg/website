@@ -1,0 +1,64 @@
+{
+  "defaultModel": "codex",
+  "models": {
+    "codex": {
+      "enabled": true,
+      "provider": "codex-cli",
+      "model": "gpt-5.4",
+      "apiKeyEnv": "OPENAI_OAUTH_TOKEN",
+      "endpoint": "cli",
+      "maxTokens": 8000,
+      "priority": 1,
+      "_comment": "Primary model. Routes through local codex CLI binary via subprocess. Uses ChatGPT Plus OAuth session from ~/.codex/auth.json."
+    },
+    "claude": {
+      "enabled": true,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "maxTokens": 8192,
+      "priority": 2,
+      "_comment": "Fallback when Codex CLI hits rate limits or is unavailable"
+    },
+    "claude-haiku": {
+      "enabled": true,
+      "provider": "anthropic",
+      "model": "claude-3-5-haiku-20241022",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "maxTokens": 8192,
+      "priority": 5,
+      "_comment": "Cheap fallback if both Codex and Claude Sonnet fail"
+    },
+    "chatgpt": {
+      "enabled": false,
+      "provider": "openai",
+      "model": "gpt-5.2",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "maxTokens": 8000,
+      "priority": 3
+    },
+    "gemini": {
+      "enabled": false,
+      "provider": "google",
+      "model": "gemini-2.0-flash",
+      "apiKeyEnv": "GOOGLE_AI_API_KEY",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "maxTokens": 8000,
+      "priority": 4
+    }
+  },
+  "fallbackOrder": ["codex", "claude", "claude-haiku", "chatgpt", "gemini"],
+  "adminEmails": ["omid.taheri.71@yahoo.com", "omidtaheri71@yahoo.com", "omid.taheri.71@gmail.com"],
+  "taskRouting": {
+    "analysis": "codex",
+    "review": "codex",
+    "chat": "codex",
+    "summary": "codex",
+    "translation": "codex",
+    "suggest": "codex",
+    "project_doc": "codex"
+  }
+}
