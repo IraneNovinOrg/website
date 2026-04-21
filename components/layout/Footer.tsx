@@ -61,7 +61,7 @@ export default function Footer() {
       />
 
       <div className="relative mx-auto max-w-7xl px-4 py-12 md:py-16">
-        <div className="grid gap-10 md:grid-cols-4">
+        <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-5">
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2.5">
@@ -133,6 +133,25 @@ export default function Footer() {
                   {t("poweredBy")}
                 </a>
               </li>
+            </ul>
+          </div>
+
+          {/* Legal */}
+          <div className="flex flex-col">
+            <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-foreground">
+              {t("legalHeading")}
+            </h3>
+            <ul className="flex flex-col gap-2.5">
+              {legalLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-sm text-muted-foreground transition-colors hover:text-iran-green dark:hover:text-iran-bright-green"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 

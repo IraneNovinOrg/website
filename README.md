@@ -117,13 +117,9 @@ Next.js 14 · TypeScript strict · SQLite (better-sqlite3, WAL) · NextAuth v5 �
 
 ---
 
-## Notes on GitHub Actions
+## Background agent
 
-The workflows in `.github/workflows/` (`agent.yml`, `sync-iranazadabad.yml`, `update-pipeline-stages.yml`) have their cron schedules **disabled by default** so the repo doesn't spam failure emails before secrets are configured. To re-enable them:
-
-1. Add the required secrets under **Settings → Secrets and variables → Actions**:
-   `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `GITHUB_BOT_TOKEN`
-2. Uncomment the `schedule:` / `cron:` lines at the top of each workflow file.
+The AI agent, GitHub Discussions sync, and pipeline-stage updates all run **in-process** via `instrumentation.ts` when the Next.js app boots — on a 15-minute cycle (`lib/agent/cycle.ts`) plus a 3-minute AI-job retry loop. No separate cron jobs or GitHub Actions are required; the only thing you need to do is keep the app running (Vercel, Cloudflare Workers, a VPS — anywhere the Node runtime stays warm). All secrets live in your hosting provider's env, not in this repo.
 
 ---
 

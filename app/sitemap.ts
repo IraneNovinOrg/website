@@ -9,7 +9,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const base = (process.env.NEXT_PUBLIC_APP_URL || "https://iranenovin.com").replace(/\/$/, "");
   const now = new Date();
 
-  const staticPaths = ["", "ideas", "projects", "members", "submit", "join"];
+  const staticPaths = ["", "ideas", "projects", "members", "submit", "join", "privacy", "terms"];
   const entries: MetadataRoute.Sitemap = [];
 
   for (const locale of ["en", "fa"] as const) {
