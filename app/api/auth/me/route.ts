@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
+import { isAdminAny } from "@/lib/admin";
 
 /**
  * Returns the current user's capabilities. Used by the UI to gate admin/lead
@@ -20,11 +20,12 @@ export async function GET(request: NextRequest) {
   let profileCompleted = false;
   let profileCompleteness = 0;
   let isLead = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let row: any = null;
   try {
     const { getDb } = await import("@/lib/db/index");
     const db = getDb();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row: any = session.user.id
+    row = session.user.id
       ? db.prepare("SELECT * FROM users WHERE id = ?").get(session.user.id)
       : email
         ? db.prepare("SELECT * FROM users WHERE email = ?").get(email)
@@ -59,7 +60,27 @@ export async function GET(request: NextRequest) {
     /* ignore */
   }
 
-  const admin = isAdmin(email);
+  // Admin resolution: check every linked identity so a user who signed in
+  // via Telegram (synthetic email) still gets admin rights if their GitHub
+  // login or Telegram id is whitelisted.
+  //
+  // Admin list entries in `_config/ai.json` may be:
+  //   • a plain email
+  //   • "github:<login>" — matches the user's linked GitHub handle
+  //   • "telegram:<chat_id>" or "telegram:@<handle>"
+  //
+  // We intentionally prefer `row.email` (the DB truth) over the session's
+  // synthetic Telegram placeholder when both exist.
+  const effectiveEmail =
+    row?.email && !String(row.email).endsWith("@telegram.iranenovin.local")
+      ? String(row.email)
+      : email;
+  const admin = isAdminAny({
+    email: effectiveEmail,
+    githubLogin: session.user.githubLogin || row?.github_login || null,
+    telegramChatId: row?.telegram_chat_id || null,
+    telegramHandle: row?.telegram_handle || null,
+  });
 
   return NextResponse.json(
     {

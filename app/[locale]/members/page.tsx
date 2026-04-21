@@ -58,6 +58,9 @@ export default function MembersPage() {
       (m.name || m.login).toLowerCase().includes(search.toLowerCase()) ||
       m.skills.some((s) => s.toLowerCase().includes(search.toLowerCase()));
 
+    // Role filter kept for search UX (e.g. show only active contributors)
+    // but the "admin" tier is intentionally not exposed — admins are just
+    // members in the public directory.
     const matchesRole = roleFilter === "all" || m.role === roleFilter;
 
     return matchesSearch && matchesRole;
@@ -65,8 +68,6 @@ export default function MembersPage() {
 
   const roles = [
     { key: "all", label: t("filterAll") },
-    { key: "admin", label: t("admins") },
-    { key: "member", label: t("developers") },
   ];
 
   return (

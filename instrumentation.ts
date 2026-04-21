@@ -39,19 +39,18 @@ export async function register() {
     console.log("[Telegram] Bot initialization scheduled (10s delay)");
 
     // ── Agent cycle ─────────────────────────────────────────────────────────
-    let cycleRunning = false;
+    // Spawned in a CHILD PROCESS, not imported into this one. better-sqlite3
+    // is synchronous, so running the cycle in-process pauses HTTP handling
+    // briefly per SQL call — the user reported a fully-frozen UI during
+    // sync. A child has its own event loop; WAL mode keeps the DB file
+    // safe under concurrent writes. See lib/agent/spawn-cycle.ts.
     const cycle = () => {
-      if (cycleRunning) return;
-      cycleRunning = true;
-      // setImmediate hands control back to the event loop before starting.
       setImmediate(async () => {
         try {
-          const { runAgentCycle } = await import("./lib/agent/cycle");
-          await runAgentCycle();
+          const { spawnAgentCycle } = await import("./lib/agent/spawn-cycle");
+          await spawnAgentCycle("agent");
         } catch (e) {
-          console.error("[Agent] Cycle error:", e);
-        } finally {
-          cycleRunning = false;
+          console.error("[Agent] Spawn error:", e);
         }
       });
     };
@@ -65,22 +64,17 @@ export async function register() {
     );
 
     // ── AI job retry loop ───────────────────────────────────────────────────
-    let retrying = false;
+    // Same off-thread story as the cycle: retry logic touches better-sqlite3
+    // + AI subprocess spawns, both of which stall the main event loop.
+    // The retry script exits fast when there's nothing to do, so spinning
+    // up a child every 3min is cheap.
     const retryLoop = () => {
-      if (retrying) return;
-      retrying = true;
       setImmediate(async () => {
         try {
-          const { processPendingAIJobs, countRetryableJobs } = await import("./lib/ai-jobs");
-          const queued = countRetryableJobs();
-          if (queued > 0) {
-            const n = await processPendingAIJobs();
-            if (n > 0) console.log(`[AI Jobs] Retried ${n} job(s)`);
-          }
+          const { spawnAgentCycle } = await import("./lib/agent/spawn-cycle");
+          await spawnAgentCycle("ai-jobs", "agent-retry");
         } catch (e) {
-          console.error("[AI Jobs] Retry loop error:", e);
-        } finally {
-          retrying = false;
+          console.error("[AI Jobs] Spawn error:", e);
         }
       });
     };
@@ -91,5 +85,18 @@ export async function register() {
     console.log(
       `[AI Jobs] Retry loop scheduled (first in ${Math.round((FIRST_DELAY_MS + 30_000) / 1000)}s, then every ${Math.round(RETRY_INTERVAL_MS / 60_000)}m)`
     );
+
+    // If the server shuts down, kill any running child cycle so we don't
+    // leak a zombie. The child's exit handler logs the outcome.
+    const shutdown = async () => {
+      try {
+        const { stopAgentCycle } = await import("./lib/agent/spawn-cycle");
+        stopAgentCycle();
+      } catch {
+        /* shutdown path — best effort */
+      }
+    };
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
   }
 }

@@ -276,7 +276,163 @@
     "members": "Members",
     "invite": "Invite",
     "howItWorks": "How It Works",
-    "poweredBy": "Powered by open source"
+    "poweredBy": "Powered by open source",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "cookies": "Cookies",
+    "legalHeading": "Legal"
+  },
+  "cookies": {
+    "title": "A note about cookies",
+    "body": "We use strictly-necessary cookies to keep you signed in and remember your preferences. No tracking, no ads.",
+    "privacyLink": "Read our privacy policy",
+    "accept": "Got it",
+    "dismiss": "Dismiss"
+  },
+  "legal": {
+    "privacy": {
+      "title": "Privacy Policy",
+      "lastUpdated": "Last updated",
+      "intro": "IranENovin (\"we\", \"us\") is a civic-technology collaboration platform. This policy explains what personal data we collect, why, and the rights you have under the EU General Data Protection Regulation (GDPR) and similar laws. If you disagree with anything here, please do not use the service.",
+      "sections": {
+        "data": {
+          "heading": "What we collect",
+          "items": [
+            "Account identity: your email address, display name, and avatar URL from the provider you sign in with (GitHub, Google, Telegram, or email/password).",
+            "Profile content you choose to add: bio, skills, languages, location, timezone, LinkedIn URL, hours-per-week availability.",
+            "Community content you create: ideas, comments, task submissions, reactions, votes, notifications you've received.",
+            "Operational metadata: the IP address of requests (used only for rate-limiting and not persisted long-term), timestamps of actions, basic log entries for debugging."
+          ]
+        },
+        "purposes": {
+          "heading": "Why we process it",
+          "items": [
+            "To let you sign in and participate — legal basis: performance of the contract you agreed to by creating an account.",
+            "To display your contributions to the community — legal basis: legitimate interest + the content you voluntarily publish.",
+            "To prevent abuse (rate-limiting, anti-spam) — legal basis: legitimate interest.",
+            "To send notifications you've opted into (email / in-app / Telegram) — legal basis: your consent, withdrawable anytime on your profile page."
+          ]
+        },
+        "cookies": {
+          "heading": "Cookies we use",
+          "intro": "We keep cookie use minimal. Everything listed below is strictly necessary or a simple preference toggle — no analytics, no advertising networks, no third-party trackers.",
+          "rows": [
+            {
+              "name": "authjs.session-token",
+              "purpose": "Signed JWT that keeps you logged in.",
+              "duration": "1 or 30 days depending on your \"Keep me signed in\" choice.",
+              "category": "Strictly necessary"
+            },
+            {
+              "name": "authjs.csrf-token",
+              "purpose": "CSRF protection on the sign-in flow.",
+              "duration": "Session",
+              "category": "Strictly necessary"
+            },
+            {
+              "name": "ie.remember",
+              "purpose": "Remembers your \"Keep me signed in\" preference during the OAuth round-trip.",
+              "duration": "10 minutes",
+              "category": "Functional"
+            },
+            {
+              "name": "theme (localStorage)",
+              "purpose": "Dark / light mode preference.",
+              "duration": "Persistent until you clear browser storage.",
+              "category": "Functional"
+            },
+            {
+              "name": "iae:dismissed-announcements:v1 (localStorage)",
+              "purpose": "Remembers which site-wide banners you've already closed.",
+              "duration": "Persistent until you clear browser storage.",
+              "category": "Functional"
+            },
+            {
+              "name": "ie.cookie-consent.v1 (localStorage)",
+              "purpose": "Remembers that you've seen this notice.",
+              "duration": "Persistent until you clear browser storage.",
+              "category": "Functional"
+            }
+          ]
+        },
+        "sharing": {
+          "heading": "Who we share with",
+          "items": [
+            "GitHub — we sync public discussions from IranAzadAbad/ideas and (when you sign in with GitHub) read your basic profile.",
+            "Google — only when you choose \"Sign in with Google\"; we receive your email, name, and avatar.",
+            "Telegram — only if you link your account or sign in via Telegram.",
+            "Our hosting and infrastructure providers (e.g. Vercel, Cloudflare) who process requests on our behalf under data-processing agreements.",
+            "We do not sell your data. We do not share it with advertising networks."
+          ]
+        },
+        "retention": {
+          "heading": "How long we keep it",
+          "items": [
+            "Account data: until you delete your account, at which point it is removed within 30 days.",
+            "Community content (ideas, comments): retained as part of the historical record, with your display name replaced on request.",
+            "Logs: rotated after 90 days.",
+            "AI operation records: 180 days for debugging."
+          ]
+        },
+        "rights": {
+          "heading": "Your rights",
+          "intro": "Under the GDPR you have the right to:",
+          "items": [
+            "Access the personal data we hold about you.",
+            "Correct inaccurate data (you can edit most of it directly in your profile).",
+            "Delete your account and associated personal data.",
+            "Export your data in a machine-readable format.",
+            "Object to or restrict processing.",
+            "Withdraw consent for notification channels anytime."
+          ],
+          "contact": "To exercise any of these rights, email us at privacy@iranenovin.com. We'll respond within 30 days."
+        }
+      }
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "lastUpdated": "Last updated",
+      "intro": "By using IranENovin you agree to these terms. They exist to keep the platform useful, safe, and aligned with its mission: helping Iranians and allies build a better future together.",
+      "sections": {
+        "use": {
+          "heading": "Acceptable use",
+          "items": [
+            "Post content you have the right to share. Respect copyright, trademarks, and other people's contributions.",
+            "No harassment, hate speech, doxxing, or targeting individuals — we remove content and accounts that cross the line.",
+            "No spam, no mass promotional content, no automated scraping beyond our public API.",
+            "No illegal content, no incitement to violence, no security attacks against the platform."
+          ]
+        },
+        "content": {
+          "heading": "Your content",
+          "items": [
+            "You keep ownership of everything you post. By posting, you grant IranENovin a non-exclusive, worldwide license to display, reproduce, and distribute it on the platform and mirror sites (e.g., a GitHub archive).",
+            "You can delete your own posts; however, quoted excerpts or archival copies on GitHub may persist.",
+            "We may remove content that violates these terms or applicable law."
+          ]
+        },
+        "availability": {
+          "heading": "Availability",
+          "body": "The service is provided as-is. We aim for high uptime but make no uptime guarantees. Planned maintenance is announced in advance when possible."
+        },
+        "liability": {
+          "heading": "Liability",
+          "body": "To the maximum extent permitted by law, IranENovin is not liable for indirect or consequential damages arising from your use of the platform. Nothing in these terms limits liability that cannot legally be limited."
+        },
+        "changes": {
+          "heading": "Changes",
+          "body": "We may update these terms. Material changes will be announced on the homepage banner or by email to registered users at least 14 days before they take effect."
+        },
+        "law": {
+          "heading": "Governing law",
+          "body": "These terms are governed by the laws of the European Union and the operator's country of residence, without regard to conflict-of-law principles. Disputes are handled in that jurisdiction."
+        },
+        "contact": {
+          "heading": "Contact",
+          "body": "Questions about these terms: legal@iranenovin.com."
+        }
+      }
+    }
   },
   "errors": {
     "notFound": "Page not found",

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/index";
 import { getAllTasksGrouped } from "@/lib/ai-tasks";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const db = getDb();
 

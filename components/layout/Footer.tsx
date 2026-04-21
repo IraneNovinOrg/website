@@ -20,6 +20,12 @@ export default function Footer() {
     { href: "/#how-it-works", label: t("howItWorks") },
   ];
 
+  const legalLinks = [
+    { href: "/privacy" as const, label: t("privacy") },
+    { href: "/terms" as const, label: t("terms") },
+    { href: "/privacy#cookies" as const, label: t("cookies") },
+  ];
+
   const socialLinks = [
     {
       href: "https://github.com/IranENovin",

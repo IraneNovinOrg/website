@@ -43,7 +43,41 @@ export function isAdmin(email: string | null | undefined): boolean {
   if (!cachedEmails || now - cachedAt > CACHE_TTL_MS) {
     refreshCache();
   }
-  return cachedEmails!.includes(normalized);
+  if (cachedEmails!.includes(normalized)) return true;
+  // Also accept a prefixed form for non-email identifiers:
+  //   github:<login>    — when the user signed in via GitHub and the admin
+  //                       list stores the login (e.g. "github:omid").
+  //   telegram:<chatId> — when the user is Telegram-only (synthetic email).
+  // Callers should use `isAdminAny()` for multi-identifier checks.
+  return false;
+}
+
+/**
+ * True if ANY of the given identifiers matches the admin list. Use this on
+ * the server-side admin-gate paths so a user who signed in via Telegram
+ * (synthetic email) or GitHub (no verified email) can still be granted
+ * admin rights as long as one of their linked identifiers is whitelisted.
+ *
+ * Accepted identifier forms in `_config/ai.json → adminEmails`:
+ *   • plain email
+ *   • "github:<login>"
+ *   • "telegram:<chat_id>"
+ */
+export function isAdminAny(identifiers: {
+  email?: string | null;
+  githubLogin?: string | null;
+  telegramChatId?: string | null;
+  telegramHandle?: string | null;
+}): boolean {
+  if (!cachedEmails || Date.now() - cachedAt > CACHE_TTL_MS) refreshCache();
+  const list = cachedEmails!;
+  const check = (v: string | null | undefined) =>
+    !!v && list.includes(v.toLowerCase().trim());
+  if (check(identifiers.email)) return true;
+  if (check(`github:${identifiers.githubLogin}`)) return true;
+  if (check(`telegram:${identifiers.telegramChatId}`)) return true;
+  if (check(`telegram:@${identifiers.telegramHandle}`)) return true;
+  return false;
 }
 
 /** Returns the full list of admin emails (read from config). */

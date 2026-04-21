@@ -1,8 +1,9 @@
 name: Update Pipeline Stages
 
 on:
-  schedule:
-    - cron: '0 */2 * * *'    # Every 2 hours
+  # Scheduled runs disabled until GITHUB_BOT_TOKEN secret is configured.
+  # schedule:
+  #   - cron: '0 */2 * * *'    # Every 2 hours
   workflow_dispatch:
 
 jobs:

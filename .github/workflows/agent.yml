@@ -1,8 +1,11 @@
 name: IranENovin Agent
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  # Scheduled runs disabled until repo secrets are configured.
+  # Re-enable by uncommenting the cron below after setting:
+  # ANTHROPIC_API_KEY, OPENAI_API_KEY, TELEGRAM_BOT_TOKEN, GITHUB_BOT_TOKEN
+  # schedule:
+  #   - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:

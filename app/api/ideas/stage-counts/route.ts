@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/index";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const db = getDb();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

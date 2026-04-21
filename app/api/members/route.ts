@@ -18,6 +18,8 @@ import { getOrgMembers } from "@/lib/github";
 import { getDb } from "@/lib/db/index";
 import type { Member } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 interface LocalUserRow {
   id: string;
   email: string;
@@ -66,6 +68,8 @@ function rowToMember(u: LocalUserRow, ideasCount = 0, projectsCount = 0): Member
     login: displayHandle(u),
     name: u.name || undefined,
     avatarUrl: u.avatar_url || "",
+    // Every local user is surfaced as a "member" in the public directory
+    // — we never leak admin status here.
     role: "member",
     skills: parseJsonArray(u.skills),
     joinedAt: u.created_at,
@@ -140,9 +144,98 @@ export async function GET() {
     ghMembers = [];
   }
 
+  // ── Every participant across every project ────────────────────────────
+  // Authors, commenters (local + github-synced), help offerers, task
+  // claimers, submitters, voters. We collect distinct logins + their most
+  // recent avatar / first seen date. Users without a local `users` row
+  // (e.g. GitHub-only commenters on IranAzadAbad discussions) show up here.
+  interface ParticipantRow {
+    login: string;
+    avatar: string | null;
+    first_seen: string | null;
+  }
+
+  const participantRows = db
+    .prepare(
+      `SELECT login, avatar, MIN(first_seen) as first_seen FROM (
+         -- Idea authors
+         SELECT author_login AS login,
+                author_avatar AS avatar,
+                MIN(created_at) AS first_seen
+         FROM ideas
+         WHERE author_login IS NOT NULL AND author_login != ''
+         GROUP BY author_login, author_avatar
+         UNION ALL
+         -- Commenters (local + github)
+         SELECT author_login AS login,
+                author_avatar AS avatar,
+                MIN(created_at) AS first_seen
+         FROM idea_comments
+         WHERE author_login IS NOT NULL AND author_login != ''
+         GROUP BY author_login, author_avatar
+         UNION ALL
+         -- Task assignees
+         SELECT assignee_name AS login,
+                NULL AS avatar,
+                MIN(claimed_at) AS first_seen
+         FROM tasks
+         WHERE assignee_name IS NOT NULL AND assignee_name != ''
+         GROUP BY assignee_name
+         UNION ALL
+         -- Submitters
+         SELECT author_name AS login,
+                NULL AS avatar,
+                MIN(created_at) AS first_seen
+         FROM submissions
+         WHERE author_name IS NOT NULL AND author_name != ''
+         GROUP BY author_name
+         UNION ALL
+         -- Help offerers
+         SELECT name AS login,
+                NULL AS avatar,
+                MIN(created_at) AS first_seen
+         FROM help_offers
+         WHERE name IS NOT NULL AND name != ''
+         GROUP BY name
+       )
+       GROUP BY login, avatar
+       ORDER BY first_seen ASC`
+    )
+    .all() as ParticipantRow[];
+
+  // Project counts per login across all of our sources. Used for the
+  // "projects touched" badge on the Member card.
+  const projectsPerLogin = new Map<string, Set<string>>();
+  const accumulate = (login: string | null, ideaId: string | null) => {
+    if (!login || !ideaId) return;
+    const k = login.toLowerCase();
+    if (!projectsPerLogin.has(k)) projectsPerLogin.set(k, new Set());
+    projectsPerLogin.get(k)!.add(ideaId);
+  };
+  (db.prepare(
+    "SELECT author_login as login, id as idea_id FROM ideas WHERE author_login IS NOT NULL"
+  ).all() as Array<{ login: string; idea_id: string }>).forEach((r) =>
+    accumulate(r.login, r.idea_id)
+  );
+  (db.prepare(
+    "SELECT author_login as login, idea_id FROM idea_comments WHERE author_login IS NOT NULL"
+  ).all() as Array<{ login: string; idea_id: string }>).forEach((r) =>
+    accumulate(r.login, r.idea_id)
+  );
+  (db.prepare(
+    "SELECT assignee_name as login, idea_id FROM tasks WHERE assignee_name IS NOT NULL"
+  ).all() as Array<{ login: string | null; idea_id: string }>).forEach((r) =>
+    accumulate(r.login, r.idea_id)
+  );
+  (db.prepare(
+    "SELECT name as login, idea_id FROM help_offers WHERE name IS NOT NULL"
+  ).all() as Array<{ login: string | null; idea_id: string }>).forEach((r) =>
+    accumulate(r.login, r.idea_id)
+  );
+
   // ── Merge ──────────────────────────────────────────────────────────────
   const byLogin = new Map<string, Member>();
-  const localIds = new Set(localRows.map((u) => u.id));
+  // (localIds set was used by an earlier sort path — removed.)
 
   // Add all local users first (authoritative).
   for (const u of localRows) {
@@ -163,17 +256,64 @@ export async function GET() {
       if (!existing.avatarUrl && g.avatarUrl) existing.avatarUrl = g.avatarUrl;
       continue;
     }
-    byLogin.set(key, { ...g, ideasCount: ideaCounts.get(g.login) || 0 });
+    byLogin.set(key, {
+      ...g,
+      // Override `role` from getOrgMembers (which may report "admin" for
+      // org owners) — the public directory treats everyone as equal.
+      role: "member",
+      ideasCount: ideaCounts.get(g.login) || 0,
+    });
   }
 
-  // Sort: local signed-up users first (most recent), then GitHub-only.
+  // Layer in participants (GitHub-synced commenters, anonymous help offers,
+  // etc.) who aren't already represented. These are "drive-by contributors"
+  // — people who interacted with a project without creating a local account.
+  for (const p of participantRows) {
+    const key = p.login.toLowerCase();
+    if (byLogin.has(key)) {
+      // Enrich an existing entry with an avatar if we now have one.
+      const existing = byLogin.get(key)!;
+      if (!existing.avatarUrl && p.avatar) existing.avatarUrl = p.avatar;
+      continue;
+    }
+    byLogin.set(key, {
+      login: p.login,
+      name: p.login,
+      avatarUrl: p.avatar || "",
+      role: "contributor",
+      skills: [],
+      joinedAt: p.first_seen || new Date(0).toISOString(),
+      ideasCount: ideaCounts.get(p.login) || 0,
+      projectsCount: projectsPerLogin.get(key)?.size || 0,
+      profileCompleted: false,
+      reputationScore: 0,
+    });
+  }
+
+  // Backfill projectsCount on every entry from the cross-source map.
+  for (const [key, m] of byLogin) {
+    const seen = projectsPerLogin.get(key)?.size || 0;
+    if (seen > (m.projectsCount || 0)) m.projectsCount = seen;
+  }
+
+  // Sort: signed-up local users first (newest first), then everyone else
+  // by engagement (projects touched), then alphabetically as a tiebreaker.
+  const localLoginSet = new Set(localRows.map((u) => displayHandle(u).toLowerCase()));
   const members = [...byLogin.values()].sort((a, b) => {
-    const aLocal = localIds.size > 0 && [...localRows].some((u) => displayHandle(u).toLowerCase() === a.login.toLowerCase());
-    const bLocal = localIds.size > 0 && [...localRows].some((u) => displayHandle(u).toLowerCase() === b.login.toLowerCase());
+    const aLocal = localLoginSet.has(a.login.toLowerCase());
+    const bLocal = localLoginSet.has(b.login.toLowerCase());
     if (aLocal !== bLocal) return aLocal ? -1 : 1;
-    const aTime = Date.parse(a.joinedAt) || 0;
-    const bTime = Date.parse(b.joinedAt) || 0;
-    return bTime - aTime;
+    if (aLocal && bLocal) {
+      // Both local — most recent signup first.
+      const aTime = Date.parse(a.joinedAt) || 0;
+      const bTime = Date.parse(b.joinedAt) || 0;
+      return bTime - aTime;
+    }
+    // Both external — rank by projects touched then by login for stability.
+    const aProj = a.projectsCount || 0;
+    const bProj = b.projectsCount || 0;
+    if (aProj !== bProj) return bProj - aProj;
+    return a.login.localeCompare(b.login);
   });
 
   return NextResponse.json(
@@ -183,6 +323,7 @@ export async function GET() {
         total: members.length,
         local: localRows.length,
         github: ghMembers.length,
+        participants: participantRows.length,
       },
     },
     {

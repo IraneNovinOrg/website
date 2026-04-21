@@ -1,8 +1,9 @@
 name: Sync IranAzadAbad Ideas
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'    # Every 5 minutes — free and unlimited on public repos
+  # Scheduled runs disabled until GITHUB_BOT_TOKEN secret is configured.
+  # schedule:
+  #   - cron: '*/5 * * * *'    # Every 5 minutes — free and unlimited on public repos
   workflow_dispatch:           # Manual trigger
 
 jobs:

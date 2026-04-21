@@ -10,6 +10,7 @@ import Footer from "@/components/layout/Footer";
 import JumpToTop from "@/components/layout/JumpToTop";
 import FeedbackButton from "@/components/feedback/FeedbackButton";
 import SiteAnnouncementBanner from "@/components/layout/SiteAnnouncementBanner";
+import CookieBanner from "@/components/layout/CookieBanner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -76,6 +77,7 @@ export default async function LocaleLayout({
             </div>
             <FeedbackButton />
             <JumpToTop />
+            <CookieBanner />
           </Providers>
         </NextIntlClientProvider>
       </body>

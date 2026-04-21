@@ -82,18 +82,13 @@ export async function GET(
     "SELECT vote_reason FROM votes WHERE idea_id = ? AND vote_reason IS NOT NULL AND vote_reason != '' ORDER BY created_at DESC LIMIT 5"
   ).all(id) as any[];
 
-  // Contributors — aggregate from every signal that implies presence on the
-  // project, not just local comments. Each source de-dupes by login on the
-  // client (ContributorsTab) so overlap is harmless.
-  //
-  //   • localCommenters — people who posted on the site (any source).
-  //     Previously filtered to source='local' which hid GitHub commenters;
-  //     that filter is gone so all discussion participants show up.
-  //   • taskClaimers / submitters — coming from tasks below.
-  //   • followers — people who tapped "Follow" (project_subscriptions).
+  // Members of a project = everyone who participated in any way:
+  // commenters (local AND GitHub-synced), task claimers/submitters, help
+  // offerers, and people who tapped "Join" (project_subscriptions).
+  // ContributorsTab dedupes by login/name, so overlap is harmless.
   const localCommenters = db.prepare(
-    "SELECT DISTINCT author_login as login, author_avatar as avatar FROM idea_comments WHERE idea_id = ? AND author_login IS NOT NULL"
-  ).all(id);
+    "SELECT DISTINCT author_login as login, author_avatar as avatar FROM idea_comments WHERE idea_id = ? AND author_login IS NOT NULL AND author_login != ''"
+  ).all(id) as Array<{ login: string; avatar: string | null }>;
 
   const taskClaimers = tasks
     .filter((t: Task) => t.assigneeName)
@@ -103,18 +98,18 @@ export async function GET(
     (submissionMap.get(t.id) || []).map((s: Submission) => ({ name: s.authorName, role: "submitted work" }))
   );
 
-  // People following the project (in-app subscriptions). We emit them as
-  // `commenters` so ContributorsTab merges them without a schema change.
+  // People who explicitly joined (project_subscriptions → "Join" button).
+  // Same shape as commenters so ContributorsTab can merge without a schema
+  // change.
   const followers = db.prepare(
     `SELECT u.name AS name, u.github_login AS login, u.avatar_url AS avatar
      FROM project_subscriptions s
      JOIN users u ON u.id = s.user_id
      WHERE s.idea_id = ?`
   ).all(id) as Array<{ name: string | null; login: string | null; avatar: string | null }>;
-  const followerCommenters = followers.map((f) => ({
-    login: f.login || f.name || "",
-    avatar: f.avatar || "",
-  })).filter((f) => f.login);
+  const joinedUsers = followers
+    .map((f) => ({ login: f.login || f.name || "", avatar: f.avatar || "" }))
+    .filter((f) => f.login);
 
   // Compute project status based on tasks
   let computedStatus = (idea as any).project_status || "idea";
@@ -141,9 +136,9 @@ export async function GET(
     helpOffers,
     voteCount,
     contributors: {
-      // localCommenters now includes GitHub-synced commenters too; followers
-      // are merged in the same shape so the UI gets them for free.
-      commenters: [...localCommenters, ...followerCommenters],
+      // Everyone who participated: commenters (local + GitHub-synced) and
+      // people who tapped Join. Dedup by login happens client-side.
+      commenters: [...localCommenters, ...joinedUsers],
       taskClaimers,
       submitters,
       helpOffers: helpOffers.map((h: any) => ({
