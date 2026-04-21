@@ -319,13 +319,41 @@ async function callOpenAI(
 //  1. codex binary exists in PATH
 //  2. ~/.codex/auth.json exists with a non-expired access_token
 //  3. If the token is near-expiry, we auto-refresh it first
+/**
+ * Pick the Codex CLI model to use, in priority order:
+ *   1. CODEX_MODEL env var  — per-machine override (best for dev boxes
+ *      whose ChatGPT plan doesn't have the config default).
+ *   2. Config `model.model`
+ * Returns a list so the caller can retry with a safer fallback if the
+ * first choice returns "model not supported with this account".
+ */
+function resolveCodexModelLadder(configured: string): string[] {
+  const envOverride = (process.env.CODEX_MODEL || "").trim();
+  const extras = (process.env.CODEX_MODEL_FALLBACKS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  // Default ladder — broad-to-narrow compatibility across ChatGPT plans.
+  const DEFAULT_LADDER = [
+    configured,
+    "gpt-5-codex",
+    "gpt-5",
+    "gpt-5-mini",
+    "o4-mini",
+  ];
+  const ladder = [envOverride, ...extras, ...DEFAULT_LADDER].filter(Boolean);
+  // Dedupe while preserving order.
+  const seen = new Set<string>();
+  return ladder.filter((m) => !seen.has(m) && seen.add(m));
+}
+
 async function callCodexCLI(
   model: ModelConfig,
   system: string,
   user: string
 ): Promise<string> {
   // Dynamic imports so top-level node-only modules don't break edge runtime
-  const { exec } = await import("child_process");
+  const { exec, spawn } = await import("child_process");
   const { promisify } = await import("util");
   const { existsSync, readFileSync, writeFileSync } = await import("fs");
   const { join } = await import("path");
@@ -390,25 +418,128 @@ async function callCodexCLI(
 
   // --- Build and execute command ---
   const fullPrompt = `${system}\n\n---\n\nUser request:\n${user}`;
-  // Escape single quotes for POSIX shell single-quoted string
-  const escaped = fullPrompt.replace(/'/g, "'\\''");
 
-  // --skip-git-repo-check: project dir may not be a git repo
-  // --dangerously-bypass-approvals-and-sandbox: non-interactive mode
-  // stderr is captured (not suppressed) for diagnostics
-  const cmd = `codex exec -m ${model.model} --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox '${escaped}'`;
+  // Try a ladder of model names. CODEX_MODEL env var wins, then config,
+  // then broadly-compatible defaults. Rotates only on errors that look
+  // like "model not supported" so transient rate-limits don't burn
+  // through the whole ladder.
+  const ladder = resolveCodexModelLadder(model.model);
+  let lastErr: Error | null = null;
+  let modelUsed = ladder[0];
 
-  console.log(`[AI Router] Calling Codex CLI with model ${model.model} (async)...`);
+  const buildArgs = (modelName: string) => [
+    "exec",
+    "-m",
+    modelName,
+    "--skip-git-repo-check",
+    "--dangerously-bypass-approvals-and-sandbox",
+    fullPrompt,
+  ];
 
-  try {
-    const { stdout, stderr } = await execAsync(cmd, {
-      encoding: "utf-8",
-      timeout: 120000, // 2 min timeout
-      maxBuffer: 1024 * 1024, // 1MB
+  // The prompt is passed as an argv element via `spawn`, so NO shell
+  // quoting is needed — previously we shell-escaped + used `exec`, which
+  // (a) failed on very long prompts and (b) left the child's stdin
+  // inherited from our pipe, which in a Next.js server-action context is
+  // not a TTY. Codex CLI uses Ink; when Ink opens a non-TTY stdin it
+  // throws "Raw mode is not supported on the current process.stdin".
+  //
+  // Fix: `stdio: ["ignore", "pipe", "pipe"]` gives the child a closed
+  // stdin so Ink skips raw-mode setup entirely. Belt-and-suspenders:
+  // CI=1 and TERM=dumb signal to Ink/most TUIs that they should render
+  // in non-interactive mode regardless.
+  const runCodex = (modelName: string): Promise<{ stdout: string; stderr: string }> =>
+    new Promise((resolve, reject) => {
+      const child = spawn("codex", buildArgs(modelName), {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          // Tell Ink and common TUI libs we're not interactive.
+          CI: "1",
+          TERM: "dumb",
+          NO_COLOR: "1",
+          FORCE_COLOR: "0",
+        },
+      });
+
+      let stdout = "";
+      let stderr = "";
+      let stdoutSize = 0;
+      let stderrSize = 0;
+      const MAX_BUFFER = 4 * 1024 * 1024; // 4MB — codex can emit a lot
+
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdoutSize += chunk.length;
+        if (stdoutSize <= MAX_BUFFER) stdout += chunk.toString("utf-8");
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderrSize += chunk.length;
+        if (stderrSize <= MAX_BUFFER) stderr += chunk.toString("utf-8");
+      });
+
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGTERM");
+        } catch { /* ignore */ }
+        reject(new Error("Codex CLI timed out after 120s"));
+      }, 120_000);
+
+      child.on("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        if (code === 0) {
+          resolve({ stdout, stderr });
+        } else {
+          // Surface the stderr tail — it usually contains the real error
+          // (bad model name, rate limit, auth expired, etc.).
+          const tail = stderr.slice(-400).trim();
+          reject(
+            new Error(
+              `Codex CLI exited code ${code}${tail ? `: ${tail}` : ""}`
+            )
+          );
+        }
+      });
     });
 
+  try {
+    // Walk the model ladder. We only advance on "model not supported" /
+    // "not available" / "invalid model" errors — a rate-limit on model A
+    // would hit model B too, and an Ink crash means the CLI is broken
+    // (no point retrying).
+    let result: { stdout: string; stderr: string } | null = null;
+    for (const candidate of ladder) {
+      modelUsed = candidate;
+      console.log(
+        `[AI Router] Calling Codex CLI with model ${candidate} (spawn, no-tty)...`
+      );
+      try {
+        result = await runCodex(candidate);
+        break;
+      } catch (e) {
+        lastErr = e as Error;
+        const msg = (e as Error).message.toLowerCase();
+        const modelUnsupported =
+          msg.includes("not supported with this account") ||
+          msg.includes("invalid model") ||
+          msg.includes("model_not_found") ||
+          msg.includes("no access to model") ||
+          msg.includes("unknown model");
+        if (!modelUnsupported) throw e;
+        console.warn(
+          `[AI Router] Model ${candidate} not available on this account — trying next fallback...`
+        );
+      }
+    }
+    if (!result) {
+      throw lastErr || new Error("All Codex models exhausted");
+    }
+    const { stdout, stderr } = result;
+
     if (stderr) {
-      console.warn(`[AI Router] Codex CLI stderr: ${stderr.slice(0, 300)}`);
+      console.warn(`[AI Router] Codex CLI (${modelUsed}) stderr: ${stderr.slice(0, 300)}`);
     }
 
     // Codex CLI prints a header block then the response. The output looks like:

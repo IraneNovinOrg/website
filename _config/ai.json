@@ -4,12 +4,12 @@
     "codex": {
       "enabled": true,
       "provider": "codex-cli",
-      "model": "gpt-5.4",
+      "model": "gpt-5-codex",
       "apiKeyEnv": "OPENAI_OAUTH_TOKEN",
       "endpoint": "cli",
       "maxTokens": 8000,
       "priority": 1,
-      "_comment": "Primary model. Routes through local codex CLI binary via subprocess. Uses ChatGPT Plus OAuth session from ~/.codex/auth.json."
+      "_comment": "Primary model. Routes through local codex CLI binary via subprocess. Uses ChatGPT Plus OAuth session from ~/.codex/auth.json. Override per-machine with CODEX_MODEL env var (e.g. CODEX_MODEL=gpt-5.4 for accounts with that tier). The router auto-falls-back through the ladder gpt-5-codex → gpt-5 → gpt-5-mini → o4-mini when a model isn't available on the signed-in account."
     },
     "claude": {
       "enabled": true,
