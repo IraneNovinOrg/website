@@ -1,6 +1,10 @@
 export const GITHUB_ORG = process.env.GITHUB_ORG || "IraneNovinOrg";
 export const GITHUB_IDEAS_REPO = process.env.GITHUB_IDEAS_REPO || "ideas";
 export const GITHUB_BOT_TOKEN = process.env.GITHUB_BOT_TOKEN || "";
+// Separate token for posting comments on external org discussions (e.g. IranAzadAbad).
+// Needs a classic PAT with public_repo scope from an account allowed to comment there.
+// Falls back to GITHUB_BOT_TOKEN if not set.
+export const GITHUB_OUTREACH_TOKEN = process.env.GITHUB_OUTREACH_TOKEN || GITHUB_BOT_TOKEN;
 export const GITHUB_IDEAS_CATEGORY_ID = process.env.GITHUB_IDEAS_CATEGORY_ID || "";
 
 export const CATEGORIES = [

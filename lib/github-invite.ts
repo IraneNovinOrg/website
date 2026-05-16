@@ -11,7 +11,7 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { graphql as ghGraphql } from "@octokit/graphql";
-import { GITHUB_BOT_TOKEN } from "./constants";
+import { GITHUB_OUTREACH_TOKEN } from "./constants";
 import { getDb } from "./db/index";
 import { logError, logInfo } from "./logger";
 
@@ -99,7 +99,7 @@ export interface PostInviteResult {
 
 async function postInviteForRow(row: IdeaRow, template: InviteTemplate, appUrl: string, opts: { force?: boolean } = {}): Promise<PostInviteResult> {
   if (!template.enabled) return { ok: false, ideaId: row.id, skipped: "disabled" };
-  if (!GITHUB_BOT_TOKEN) return { ok: false, ideaId: row.id, skipped: "missing_token" };
+  if (!GITHUB_OUTREACH_TOKEN) return { ok: false, ideaId: row.id, skipped: "missing_token" };
   if (!opts.force && row.github_invite_posted_at) {
     return { ok: false, ideaId: row.id, skipped: "already_posted" };
   }
@@ -107,7 +107,7 @@ async function postInviteForRow(row: IdeaRow, template: InviteTemplate, appUrl: 
   if (!parsed) return { ok: false, ideaId: row.id, skipped: "unsupported_source" };
 
   const gql = ghGraphql.defaults({
-    headers: { authorization: `Bearer ${GITHUB_BOT_TOKEN}` },
+    headers: { authorization: `Bearer ${GITHUB_OUTREACH_TOKEN}` },
   });
 
   const projectSlug = row.id;
