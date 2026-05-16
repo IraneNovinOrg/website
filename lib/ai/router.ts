@@ -337,6 +337,8 @@ function resolveCodexModelLadder(configured: string): string[] {
   const DEFAULT_LADDER = [
     configured,
     "gpt-5.4",
+    "gpt-5.2",
+    "gpt-5.1",
     "gpt-5",
     "gpt-5-mini",
     "o4-mini",
@@ -498,8 +500,8 @@ async function callCodexCLI(
         try {
           child.kill("SIGTERM");
         } catch { /* ignore */ }
-        reject(new Error("Codex CLI timed out after 240s"));
-      }, 240_000);
+        reject(new Error("Codex CLI timed out after 600s"));
+      }, 600_000);
 
       child.on("error", (err) => {
         clearTimeout(timer);
@@ -559,7 +561,7 @@ async function callCodexCLI(
         const hardFail =
           msg.includes("enoent") ||                 // codex binary missing
           msg.includes("codex cli not found") ||
-          msg.includes("timed out after");          // our own 240s cap
+          msg.includes("timed out after");          // our own 600s cap
         if (hardFail) throw e;
         console.warn(
           `[AI Router] Codex model ${candidate} failed (${(e as Error).message.slice(0, 120)}) — trying next fallback...`
@@ -641,7 +643,7 @@ async function callCodexCLI(
     }
     if (combined.includes("ETIMEDOUT") || combined.includes("timeout") || combined.includes("killed")) {
       throw new Error(
-        `Codex CLI timed out after 240s. The model "${model.model}" may be slow or unavailable.`
+        `Codex CLI timed out after 600s. The model "${model.model}" may be slow or unavailable.`
       );
     }
     if (combined.includes("ENOENT")) {
