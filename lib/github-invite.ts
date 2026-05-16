@@ -20,13 +20,13 @@ const CONFIG_PATH = join(process.cwd(), "_config", "github-invite.json");
 export const DEFAULT_TEMPLATE = {
   enabled: true,
   body: [
-    "👋 **Exciting update — this idea is now a live project on IranENovin!**",
+    "👋 Hi everyone, this idea has been picked up on IranENovin — a platform where ideas from discussions like this get organized into real projects with tasks, contributors, and AI agents helping move things forward.",
     "",
-    "If you want to help turn this into reality, join the team, claim a task, or just follow along, head over to:",
+    "If you want to help turn this into reality, join the team, claim a task, or just follow along:",
     "",
     "🔗 **{{projectUrl}}**",
     "",
-    "Thanks to everyone who upvoted and discussed this here — your signal is what brought it to life. See you on the other side. 🚀",
+    "Thanks to everyone who contributed here — this wouldn't have made it this far without you. See you on the other side 🚀",
   ].join("\n"),
 };
 
