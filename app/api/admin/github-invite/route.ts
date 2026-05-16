@@ -6,6 +6,8 @@
  *   POST   /api/admin/github-invite { ideaId }     → post for one idea
  *   POST   /api/admin/github-invite { bulk: true, filter: {...} }
  *                                                  → post for all matching
+ *   POST   /api/admin/github-invite { markPosted: true, ideaId }
+ *                                                  → manually mark as posted (no API call)
  *   GET    /api/admin/github-invite/template       → current template
  *   PUT    /api/admin/github-invite/template       → update template
  */
@@ -60,8 +62,19 @@ export async function POST(request: NextRequest) {
     ideaId?: string;
     bulk?: boolean;
     force?: boolean;
+    markPosted?: boolean;
+    commentUrl?: string;
     filter?: BulkInviteFilter;
   };
+
+  if (body.markPosted) {
+    if (!body.ideaId) return NextResponse.json({ error: "ideaId required" }, { status: 400 });
+    const db = getDb();
+    db.prepare(
+      `UPDATE ideas SET github_invite_posted_at = ?, github_invite_comment_url = ? WHERE id = ?`
+    ).run(new Date().toISOString(), body.commentUrl || null, body.ideaId);
+    return NextResponse.json({ ok: true, ideaId: body.ideaId, manual: true });
+  }
 
   if (body.bulk) {
     const summary = await postInviteBulk({

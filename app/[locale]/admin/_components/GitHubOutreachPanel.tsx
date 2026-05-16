@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, RefreshCw, Send, Save, Filter, Eye, CheckCircle2, AlertCircle } from "lucide-react";
+import { ExternalLink, RefreshCw, Send, Save, Filter, Eye, CheckCircle2, AlertCircle, Copy, ClipboardCheck } from "lucide-react";
 
 interface IdeaRow {
   id: string;
@@ -28,6 +28,7 @@ export function GitHubOutreachPanel() {
   const [ideas, setIdeas] = useState<IdeaRow[]>([]);
   const [totals, setTotals] = useState<Totals>({ total: 0, posted: 0, pending: 0 });
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Template editor state
   const [templateBody, setTemplateBody] = useState("");
@@ -104,6 +105,36 @@ export function GitHubOutreachPanel() {
         n.delete(ideaId);
         return n;
       });
+    }
+  }
+
+  function copyText(idea: IdeaRow) {
+    const projectUrl = `https://iranenovin.com/en/projects/${idea.id}`;
+    const text = templateBody
+      .replace(/\{\{\s*projectUrl\s*\}\}/g, projectUrl)
+      .replace(/\{\{\s*title\s*\}\}/g, idea.title);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(idea.id);
+      setTimeout(() => setCopiedId((c) => (c === idea.id ? null : c)), 2500);
+      toast.success("Copied — paste it into the GitHub discussion");
+    });
+  }
+
+  async function markPosted(ideaId: string) {
+    setBusyIds((s) => new Set(s).add(ideaId));
+    try {
+      const res = await fetch("/api/admin/github-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markPosted: true, ideaId }),
+      });
+      if (!res.ok) throw new Error("Failed to mark as posted");
+      toast.success("Marked as posted");
+      await loadData();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusyIds((s) => { const n = new Set(s); n.delete(ideaId); return n; });
     }
   }
 
@@ -339,7 +370,10 @@ export function GitHubOutreachPanel() {
           title={`Pending (${pendingIdeas.length})`}
           rows={pendingIdeas}
           busyIds={busyIds}
+          copiedId={copiedId}
           onPost={(id) => postOne(id)}
+          onCopy={copyText}
+          onMarkPosted={markPosted}
           showPosted={false}
         />
 
@@ -349,7 +383,10 @@ export function GitHubOutreachPanel() {
               title={`Already posted (${postedIdeas.length})`}
               rows={postedIdeas}
               busyIds={busyIds}
+              copiedId={copiedId}
               onPost={(id) => postOne(id, { force: true })}
+              onCopy={copyText}
+              onMarkPosted={markPosted}
               showPosted
             />
           </div>
@@ -374,13 +411,19 @@ function IdeaTable({
   title,
   rows,
   busyIds,
+  copiedId,
   onPost,
+  onCopy,
+  onMarkPosted,
   showPosted,
 }: {
   title: string;
   rows: IdeaRow[];
   busyIds: Set<string>;
+  copiedId: string | null;
   onPost: (id: string) => void;
+  onCopy: (idea: IdeaRow) => void;
+  onMarkPosted: (id: string) => void;
   showPosted: boolean;
 }) {
   return (
@@ -430,36 +473,57 @@ function IdeaTable({
                       )}
                     </td>
                     <td className="px-2 py-1.5">
-                      {showPosted && r.github_invite_comment_url ? (
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* Copy text for manual posting */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onCopy(r)}
+                          title="Copy outreach text to clipboard"
+                        >
+                          {copiedId === r.id
+                            ? <><ClipboardCheck className="mr-1 h-3 w-3 text-iran-green" /> Copied</>
+                            : <><Copy className="mr-1 h-3 w-3" /> Copy</>}
+                        </Button>
+
+                        {/* Open GitHub discussion */}
+                        {r.source_url && (
                           <a
-                            href={r.github_invite_comment_url}
+                            href={r.source_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-iran-green hover:underline"
                           >
-                            <CheckCircle2 className="h-3 w-3" />
-                            posted
+                            <Button size="sm" variant="outline" title="Open GitHub discussion">
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
                           </a>
+                        )}
+
+                        {/* Mark as posted manually */}
+                        {!showPosted && (
                           <Button
                             size="sm"
                             variant="outline"
                             disabled={busy}
-                            onClick={() => onPost(r.id)}
+                            onClick={() => onMarkPosted(r.id)}
+                            title="Mark as posted (after manual posting)"
+                            className="text-iran-green border-iran-green/40"
                           >
-                            Re-post
+                            {busy ? "…" : <><CheckCircle2 className="mr-1 h-3 w-3" /> Mark posted</>}
                           </Button>
-                        </div>
-                      ) : (
+                        )}
+
+                        {/* Auto-post (may fail on external orgs) */}
                         <Button
                           size="sm"
                           disabled={busy}
                           onClick={() => onPost(r.id)}
                           className="bg-iran-green hover:bg-iran-deep-green"
+                          title={showPosted ? "Re-post via API" : "Post via API"}
                         >
-                          {busy ? "…" : (<><Send className="mr-1 h-3 w-3" /> Post</>)}
+                          {busy ? "…" : <><Send className="mr-1 h-3 w-3" />{showPosted ? "Re-post" : "Auto"}</>}
                         </Button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 );
