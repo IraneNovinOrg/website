@@ -5,7 +5,7 @@
   "maxAnalysesPerCycle": 2,
   "maxReviewsPerCycle": 3,
   "cooldownMinutes": 10,
-  "autoActivateMinVotes": 20,
+  "autoActivateMinVotes": 40,
   "analyzeMinVotes": 48,
   "triggers": {
     "comment_added": {
