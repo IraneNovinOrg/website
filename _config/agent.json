@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "cyclePeriodMinutes": 15,
-  "maxAnalysesPerCycle": 2,
+  "maxAnalysesPerCycle": 5,
   "maxReviewsPerCycle": 3,
   "cooldownMinutes": 10,
   "autoActivateMinVotes": 40,
